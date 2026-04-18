@@ -15,6 +15,8 @@ use Icinga\Module\Icingadb\Common\Links;
 use Icinga\Module\Icingadb\Model\CustomvarFlat;
 use Icinga\Module\Icingadb\Model\Host;
 use Icinga\Module\Icingadb\Model\Service;
+use Icinga\Module\Icingadb\Util\PerfData;
+use Icinga\Module\Icingadb\Util\PerfDataSet;
 
 use ipl\Html\Html;
 use ipl\Html\HtmlDocument;
@@ -393,12 +395,9 @@ trait IcingaDbGrapher
             return HtmlString::create('');
         }
 
+        #### MY HACKS BELOW
         if ($this->repeatable === "yes") {
-            $panelEnd =  ($this->panelId - 1) + intval(substr_count(strval($object->state->performance_data), '=') / $this->numberMetrics);
-            $this->panelId = implode(
-                ',',
-                range($this->panelId, $panelEnd)
-            );
+            $this->panelId = implode(',', array_map(function($perfdata){return $perfdata->getLabel() . '$panel-1';},PerfDataSet::fromString($this->object->state->performance_data)->asArray()));
         }
 
         // Replace special chars for graphite
@@ -471,10 +470,12 @@ trait IcingaDbGrapher
         } else {
             $this->title = '';
         }
-
+        
+        ##### MY HACKS BELOW
         foreach (explode(',', $this->panelId) as $panelid) {
             $html = new HtmlDocument();
-            $this->panelId = $panelid;
+           
+            $this->panelId = urlencode($panelid);
 
             // The image value will be returned as reference
             $previewHtml = new HtmlDocument();
@@ -487,7 +488,7 @@ trait IcingaDbGrapher
                     if ($this->dashboardLink) {
                         $linkUrl = preg_replace('/(viewPanel=)[^&]+/', '', $linkUrl);
                     } else {
-                        $linkUrl = preg_replace('/(viewPanel=)[^&]+/', '${1}' . $panelid, $linkUrl);
+                        $linkUrl = preg_replace('/(viewPanel=)[^&]+/', '${1}' . urlencode($this->panelId), $linkUrl);
                     }
                     $textLink = new Link('View in Grafana', $linkUrl, ['target' => '_blank', 'class' => 'external-link']);
                     $html->add($textLink);
@@ -727,6 +728,7 @@ trait IcingaDbGrapher
             )
         );
 
+
         if (isset($customvars[$this->custvarconfig])) {
             $grafanaTable->add(
                 Html::tag(
@@ -751,6 +753,7 @@ trait IcingaDbGrapher
             )
         );
 
+
         if ($this->accessMode === "proxy") {
             $grafanaTable->add(
                 Html::tag(
@@ -773,8 +776,10 @@ trait IcingaDbGrapher
                     ]
                 )
             );
+
         }
 
         return $grafanaTable;
     }
 }
+
